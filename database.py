@@ -45,11 +45,17 @@ class DB:
     def query(self, query):
         try:
             response = self.con.execute(query)
-            return response
+            return response.fetchall()
         except Exception as e:
             err_msg = traceback.format_exc()
             st.error(f'Error: {e}')
 
+    def get_cols(self, table_name: Literal['Partylist','Senators']):
+        match table_name:
+            case 'Partylist':
+                return self.query('PRAGMA table_info(partylist_votes)')
+            case 'Senators':
+                return self.query('PRAGMA table_info(senator_votes)')
 
 class DataParse(DB):
     '''Mainly used to upload. Dataset are deprecated'''
