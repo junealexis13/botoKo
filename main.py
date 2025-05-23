@@ -1,5 +1,6 @@
 import streamlit as st
 from database import DB
+from widgets import Widgets
 
 with st.container(border=True):
     st.title('BoToKoTo')
@@ -25,17 +26,16 @@ with st.container(border=True):
 
     lookup = st.selectbox(showTable, fixed_cols)
 
-
-with st.form(key='show-body-main'):
-
-    run = st.form_submit_button('Run')
+    run = st.button("Run")
     if run:
         match scope:
             case "National Level":
-                getdata = db1.query(f"SELECT SUM('{raw_cols[fixed_cols.index(lookup)]}') FROM {fetch_table}")
-                print(getdata)
-    #<-- code logic here-->
+                getdata = db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") FROM {fetch_table}')
+                st.write(getdata[0][0])
 
+        with st.container(border=True):
+            widgets = Widgets()
+            widgets.rankings(showTable)
 
 with st.expander('Advanced', expanded=False):
     with st.form('SQLite3-QueryMaster'):
