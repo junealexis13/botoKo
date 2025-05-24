@@ -6,6 +6,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+import os, glob
+
 class Widgets(DB):
     def __init__(self):
         super().__init__()
@@ -43,3 +45,85 @@ class Widgets(DB):
                             marker_color='#ed5e45'
                         ))
                 st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+
+    def showVotes(self, votes: int, candidate: str):
+        path_dir: str = os.path.join('templates','showvotes.html')
+        f = open(path_dir,'r', encoding='utf-8')
+        html = f.read().format(candidate,f"{votes:,}")
+        st.html(html.format(votes, candidate))
+    
+    def showVotes_byRegion(self, dataSet: list, candidate: str):
+        with st.container(border=True):
+            st.subheader('Regional Vote Summary', divider=True)
+            dataSet = [x[::-1] for x in dataSet]
+            df = pd.DataFrame(data=dataSet, columns=['Province','Votes'])
+            fig = px.bar(df.sort_values(by='Votes', ascending=False), 
+                        x='Province', 
+                        y='Votes', 
+                        color='Votes',
+                        color_continuous_scale='Cividis',
+                        text='Votes')
+            
+            fig.update_layout(
+                title=f'Regional Votes for {candidate}',  
+                title_font_size=16, 
+                height=500,  
+                yaxis_title='Votes',
+                xaxis_title='Province',
+                xaxis=dict(
+                    tickfont=dict(
+                        family='Sans-serif', 
+                        size=8,
+                        )
+                    )
+                )
+
+            fig.update_traces(
+                texttemplate='%{text:,}',     # format with comma
+                textposition='outside',      # place label outside/above the bar
+            )
+
+            st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+
+    def showVotes_byProvince(self, dataSet: list, candidate: str):
+        with st.container(border=True):
+            st.subheader('Provincial Vote Summary', divider=True)
+            dataSet = [x[::-1] for x in dataSet]
+            df = pd.DataFrame(data=dataSet[:20], columns=['Province','Votes'])
+            fig = px.bar(df.sort_values(by='Votes', ascending=False), 
+                        x='Province', 
+                        y='Votes', 
+                        color='Votes',
+                        color_continuous_scale='RdPu_r',
+                        text='Votes')
+            
+            fig.update_layout(
+                title=f'TOP20 Provinces who voted for {candidate}',  
+                title_font_size=16, 
+                yaxis_title='Votes',
+                xaxis_title='Province',
+                xaxis=dict(
+                    tickfont=dict(
+                        family='Sans-serif', 
+                        size=8,
+                        )
+                    )
+                )
+
+            fig.update_traces(
+                texttemplate='%{text:,}',     # format with comma
+                textposition='outside',      # place label outside/above the bar
+            )
+
+            st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+
+    def showVotes_by_specificCity(self, city_address:str, candidate:str, table: str):
+        with st.container(border=True):
+            st.subheader('Specified Location (City/Municipality)', divider=True)
+
+            citymuni, province = city_address.split(" (")
+            dataset = self.query(f'''SELECT SUM("{candidate}")
+                                 FROM {table} 
+                                 WHERE municipality = "{citymuni}"
+                                    AND province = "{province.upper().strip(")")}"''')
+            st.write(dataset)
