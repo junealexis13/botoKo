@@ -2,18 +2,28 @@ import streamlit as st
 from database import DB
 from widgets import Widgets
 from typing import Literal, cast
+import os
 
 
 #inits
 widgets = Widgets()
 
+# initialize database coonections
+db1 = DB()
+
 with st.container(border=True):
-    st.title('BoToKoTo')
-    st.caption('A simple Geographical Viewer for 2025 Midterm Election Data for Partylist and Senators.')
+    img, hero = st.columns([.25,.75])
+    with img:
+        st.image(os.path.join('btkt.png'))
+    with hero:
+        st.title('BoToKoTo BTKT')
+        st.caption('A simple Data Viewer for 2025 Midterm Election Data for Partylist and Senators.')
+
+widgets.rankings(cast(Literal['Partylist', 'Senators'],'Senators'))
+widgets.rankings(cast(Literal['Partylist', 'Senators'], 'Partylist'))
 
 with st.container(border=True):
     st.subheader('Set Lookup', divider=True)
-
     #sections
     acol1, acol2 = st.columns([1,1])
     bcol1, bcol2 = st.columns([1,1])
@@ -22,7 +32,7 @@ with st.container(border=True):
         with acol1:
             showTable = st.selectbox('Table', ["Senators","Partylist"])
         with acol2:
-            db1 = DB()
+
             # manage table headers
 
             #params
@@ -46,11 +56,8 @@ with st.container(border=True):
         brgy = st.selectbox('Barangay', [f"{x[0]} ({x[1].title()}, {x[2].title()})"  for x in unique_barangay],  key='selection-bybrgy')
         
         #filter settings
-        enable_byMuni = st.checkbox("Show by City/Municipality Level Filter")
-        enable_byBarangay = st.checkbox("Show by Barangay Level Filter")
-
-
-
+        enable_byMuni = st.checkbox("Show by City/Municipality Level")
+        enable_byBarangay = st.checkbox("Show by Barangay Level")
 
         run = st.form_submit_button("Run")
         
@@ -58,18 +65,10 @@ with st.container(border=True):
         widgets.showVotes(votes=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") FROM {fetch_table}')[0][0], candidate=lookup)
         widgets.showVotes_byRegion(dataSet=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") as votes,region FROM {fetch_table} GROUP BY region ORDER BY votes DESC'), candidate=lookup )
         widgets.showVotes_byProvince(dataSet=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") as votes,province FROM {fetch_table} GROUP BY province ORDER BY votes DESC'), candidate=lookup )
-        widgets.showVotes_by_specificCity(muni, candidate=raw_cols[fixed_cols.index(lookup)], table=fetch_table)
+        if enable_byMuni:
+            widgets.showVotes_by_specificCity(muni, candidate=raw_cols[fixed_cols.index(lookup)], table=fetch_table)
+        if enable_byBarangay:
+            widgets.showVotes_by_specificBrgy(brgy, candidate=raw_cols[fixed_cols.index(lookup)], table=fetch_table)
         # with st.container(border=True):
         #     widgets.rankings(cast(Literal['Senators', 'Partylist'], showTable))
 
-with st.expander('Advanced', expanded=False):
-    with st.form('SQLite3-QueryMaster'):
-        query = st.text_area('SQLite Query', height=350, placeholder='SELECT * FROM table')
-        run = st.form_submit_button('Run Query')
-        if run:
-            db = DB()
-            st.divider()
-            st.caption('Running Query')
-            st.code(query,"sql")
-            st.caption('Response')
-            st.write(db.query(query))

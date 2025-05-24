@@ -16,35 +16,83 @@ class Widgets(DB):
     def rankings(self, mode: Literal['Senators','Partylist']):
         match mode:
             case 'Senators':
-                query_STR = "\n"
-                for x in self.get_cols("Senators")[12:]:
-                    query_STR+=f'SUM("{x[1]}"), \n'
-                fixed_cols = [" ".join(x[1].split(" ")[1:]) for x in self.get_cols("Senators")][12:]
-                resp = self.query(f'SELECT {query_STR[:-3]} FROM senator_votes')
+                with st.container(border=True):
+                    st.subheader('Senatorial Rankings - Midterm Election 2025',divider=True)
+                    cutoff = st.slider('Number of Candidates to Show', max_value=66,step=1)
+                    if cutoff > 0:
+                        query_STR = "\n"
+                        for x in self.get_cols("Senators")[12:]:
+                            query_STR+=f'SUM("{x[1]}"), \n'
+                        fixed_cols = [" ".join(x[1].split(" ")[1:]) for x in self.get_cols("Senators")][12:]
+                        resp = self.query(f'SELECT {query_STR[:-3]} FROM senator_votes')
 
-                #cast to df
-                df = pd.DataFrame(data=resp,columns=fixed_cols).T
-                df.columns = ['votes']
-                sorted = df.sort_values(by='votes', ascending=False)
+                        #cast to df
+                        df = pd.DataFrame(data=resp,columns=fixed_cols).T
+                        df.columns = ['votes']
+                        sorted = df.sort_values(by='votes', ascending=False)
 
-                st.subheader('Senatorial Rankings - Midterm Election 2025',divider=True)
-                fig = go.Figure()
-                fig.add_trace(go.Bar(x=sorted.index,y=sorted['votes'][:15], showlegend=False))
-                fig.update_traces(marker_color=['#17e6a4']*12 + ['#ed5e45']*3)
-                fig.add_trace(go.Bar(
-                            x=[None],
-                            y=[None],
-                            name='Green Bars (Magic 12)',
-                            marker_color='#17e6a4'
-                        ))
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(x=sorted.index,y=sorted['votes'][:cutoff],  text=sorted['votes'][:cutoff]))
 
-                fig.add_trace(go.Bar(
-                            x=[None],
-                            y=[None],
-                            name='Red Bars (Didn"t made it)',
-                            marker_color='#ed5e45'
-                        ))
-                st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+                        others = cutoff - 12
+                        fig.update_traces(marker_color=['#17e6a4']*12 + ['#ed5e45']*others,
+                                        texttemplate='%{text:,}',     
+                                        textposition='inside')    
+                        
+                        fig.update_layout(
+                            title=f'Showing Top {cutoff} candidates - Magic 12 in Green',
+                            xaxis_title='Senator',
+                            xaxis=dict(
+                            tickfont=dict(
+                                family='Sans-serif', 
+                                size=8,
+                                )
+                            )
+                        )
+                        st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+
+            case 'Partylist':
+                with st.container(border=True):
+                    query_STR = "\n"
+                    st.subheader('Partylist Rankings - Midterm Election 2025',divider=True)
+                    cutoff = st.slider('Number of Candidates to Show', max_value=156,step=1)
+                    if cutoff > 0:
+                        for x in self.get_cols("Partylist")[12:]:
+                            query_STR+=f'SUM("{x[1]}"), \n'
+                        fixed_cols = [" ".join(x[1].split(" ")[1:]) for x in self.get_cols("Partylist")][12:]
+                        resp = self.query(f'SELECT {query_STR[:-3]} FROM partylist_votes')
+
+                        #cast to df
+                        df = pd.DataFrame(data=resp,columns=fixed_cols).T
+                        df.columns = ['votes']
+                        sorted = df.sort_values(by='votes', ascending=False)
+
+
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(x=sorted.index,y=sorted['votes'][:cutoff],
+                                            text=sorted['votes'][:cutoff],
+                                            ))
+
+                        fig.update_traces(marker_color="#d8e617",
+                                        texttemplate='%{text:,}',     
+                                        textposition='inside')    
+                        
+                        fig.update_layout(
+                            title=f'Showing Top {cutoff} candidates',
+                            xaxis_title='Partylist',
+                            xaxis=dict(
+                            tickfont=dict(
+                                family='Sans-serif', 
+                                size=8,
+                                )
+                            ),
+                            legend=dict(
+                                orientation="h", 
+                                yanchor="top",            
+                                xanchor="center",
+                            )
+                        )
+                        st.plotly_chart(fig, use_container_width=True, theme='streamlit')
 
     def showVotes(self, votes: int, candidate: str):
         path_dir: str = os.path.join('templates','showvotes.html')
@@ -85,45 +133,116 @@ class Widgets(DB):
 
             st.plotly_chart(fig, use_container_width=True, theme='streamlit')
 
+    @st.fragment
     def showVotes_byProvince(self, dataSet: list, candidate: str):
         with st.container(border=True):
             st.subheader('Provincial Vote Summary', divider=True)
             dataSet = [x[::-1] for x in dataSet]
-            df = pd.DataFrame(data=dataSet[:20], columns=['Province','Votes'])
-            fig = px.bar(df.sort_values(by='Votes', ascending=False), 
-                        x='Province', 
-                        y='Votes', 
-                        color='Votes',
-                        color_continuous_scale='RdPu_r',
-                        text='Votes')
-            
-            fig.update_layout(
-                title=f'TOP20 Provinces who voted for {candidate}',  
-                title_font_size=16, 
-                yaxis_title='Votes',
-                xaxis_title='Province',
-                xaxis=dict(
-                    tickfont=dict(
-                        family='Sans-serif', 
-                        size=8,
+            df = pd.DataFrame(data=dataSet, columns=['Province','Votes'])
+
+            cutoff = st.slider("Show No. of Provinces", max_value=len(df))
+            if cutoff > 0:
+                fig = px.bar(df.sort_values(by='Votes', ascending=False)[:cutoff], 
+                            x='Province', 
+                            y='Votes', 
+                            color='Votes',
+                            color_continuous_scale='RdPu_r',
+                            text='Votes')
+                
+                fig.update_layout(
+                    title=f'Showing top {cutoff} Provinces that voted for {candidate}',  
+                    title_font_size=14, 
+                    yaxis_title='Votes',
+                    xaxis_title='Province',
+                    xaxis=dict(
+                        tickfont=dict(
+                            family='Sans-serif', 
+                            size=6,
+                            )
                         )
                     )
+
+                fig.update_traces(
+                    texttemplate='%{text:,}',     # format with comma
+                    textposition='outside',      # place label outside/above the bar
                 )
 
-            fig.update_traces(
-                texttemplate='%{text:,}',     # format with comma
-                textposition='outside',      # place label outside/above the bar
-            )
+                st.plotly_chart(fig, use_container_width=True, theme='streamlit')
 
-            st.plotly_chart(fig, use_container_width=True, theme='streamlit')
-
+    @st.fragment
     def showVotes_by_specificCity(self, city_address:str, candidate:str, table: str):
         with st.container(border=True):
-            st.subheader('Specified Location (City/Municipality)', divider=True)
+            st.subheader('Specified Location (City/Municipality or International)', divider=True)
 
             citymuni, province = city_address.split(" (")
             dataset = self.query(f'''SELECT SUM("{candidate}")
                                  FROM {table} 
                                  WHERE municipality = "{citymuni}"
                                     AND province = "{province.upper().strip(")")}"''')
-            st.write(dataset)
+            
+            #create a component
+            place = f'{citymuni}, {province.upper().strip(")")}'
+            path_dir: str = os.path.join('templates','showvotes_city.html')
+            f = open(path_dir,'r', encoding='utf-8')
+            html = f.read().format(place,f"{dataset[0][0]:,}")
+            st.html(html)
+
+
+
+            perbrgy = self.query(f'''SELECT SUM("{candidate}"), barangay 
+                                FROM {table} 
+                                WHERE municipality="{citymuni}" GROUP BY barangay''')
+            
+            perbrgy = [x[::-1] for x in perbrgy]
+            df = pd.DataFrame(data=perbrgy, columns=['Barangay','Votes'])
+
+            cutoff = st.slider("Show No. of City", max_value=len(df))
+            if cutoff > 0:
+
+                fig = px.bar(df.sort_values(by='Votes', ascending=False)[:cutoff], 
+                            x='Barangay', 
+                            y='Votes', 
+                            color='Votes',
+                            color_continuous_scale='Magma_r',
+                            text='Votes')
+                
+                fig.update_layout(
+                    title=f'Showing {cutoff} Brgys voted for {candidate}',  
+                    title_font_size=16, 
+                    yaxis_title='Votes',
+                    xaxis_title='Barangay',
+                    xaxis=dict(
+                        tickfont=dict(
+                            family='Sans-serif', 
+                            size=8,
+                            )
+                        )
+                    )
+
+                fig.update_traces(
+                    texttemplate='%{text:,}',     # format with comma
+                    textposition='outside',      # place label outside/above the bar
+                )
+
+                st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+
+    def showVotes_by_specificBrgy(self, brgy_address:str, candidate:str, table: str):
+        with st.container(border=True):
+            st.subheader('Specified Location (Barangay Level)', divider=True)
+
+            brgy, composite = brgy_address.split(" (")
+            citymuni, province = composite.strip(")").split(", ")
+
+
+            dataset = self.query(f'''SELECT SUM("{candidate}")
+                                 FROM {table} 
+                                 WHERE barangay = "{brgy}"
+                                 AND municipality = "{citymuni.upper()}"
+                                 AND province = "{province.upper()}"''')
+            
+            #create a component
+            place = f'{brgy}, {citymuni}, {province.upper().strip(")")}'
+            path_dir: str = os.path.join('templates','showvotes_brgy.html')
+            f = open(path_dir,'r', encoding='utf-8')
+            html = f.read().format(place,f"{dataset[0][0]:,}")
+            st.html(html)
