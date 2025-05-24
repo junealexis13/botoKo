@@ -7,7 +7,7 @@ import traceback
 
 class DB:
     def __init__(self):
-        self.con = sqlite3.connect('election_data.db')
+        self.con = sqlite3.connect('election_data.db',check_same_thread=False)
         self.db = self.con.cursor()
 
     def table_exists(self, table_name: str) -> bool:
