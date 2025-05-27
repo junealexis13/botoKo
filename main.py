@@ -7,6 +7,7 @@ import os
 
 #inits
 widgets = Widgets()
+widgets.init_session_state()
 
 # initialize database coonections
 db1 = DB()
@@ -62,7 +63,7 @@ with st.container(border=True):
         run = st.form_submit_button("Run")
         
     if run:
-        widgets.showVotes(votes=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") FROM {fetch_table}')[0][0], candidate=lookup)
+        widgets.showVotes(votes=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") FROM {fetch_table}')[0][0], candidate=lookup, table = fetch_table)
         widgets.showVotes_byRegion(dataSet=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") as votes,region FROM {fetch_table} GROUP BY region ORDER BY votes DESC'), candidate=lookup )
         widgets.showVotes_byProvince(dataSet=db1.query(f'SELECT SUM("{raw_cols[fixed_cols.index(lookup)]}") as votes,province FROM {fetch_table} GROUP BY province ORDER BY votes DESC'), candidate=lookup )
         if enable_byMuni:

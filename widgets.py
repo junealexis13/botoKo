@@ -13,12 +13,46 @@ class Widgets(DB):
         super().__init__()
 
 
+    def init_session_state(self):
+        if "TOP_SEN" not in st.session_state:
+            st.session_state['TOP_SEN'] = 15
+
+        if "TOP_PARTY" not in st.session_state:
+            st.session_state['TOP_PARTY'] = 30
+
+    def get_total_votes(self, mode: Literal['Senators','Partylist']):
+        match mode:
+            case 'Senators':
+                resp = self.query('SELECT SUM(registeredVoters) FROM senator_votes')
+                return resp[0][0]
+            case 'Partylist':
+                resp = self.query('SELECT SUM(registeredVoters) FROM partylist_votes')
+                return resp[0][0]
+    def get_senator_ranking(self, candidate: str, table: str):
+        query_STR = "\n"
+        if table == "senator_votes":
+            for x in self.get_cols("Senators")[12:]:
+                query_STR+=f'SUM("{x[1]}"), \n'
+            fixed_cols = [" ".join(x[1].split(" ")[1:]) for x in self.get_cols("Senators")][12:]
+        else:
+            for x in self.get_cols("Partylist")[12:]:
+                query_STR+=f'SUM("{x[1]}"), \n'
+            fixed_cols = [" ".join(x[1].split(" ")[1:]) for x in self.get_cols("Partylist")][12:]
+
+    
+        resp = self.query(f'SELECT {query_STR[:-3]} FROM {table}')
+        df = pd.DataFrame(data=resp,columns=fixed_cols).T
+        df.columns = ['votes']
+        sortedDf = df.sort_values(by='votes', ascending=False)
+        sortedDf['Ranking'] = range(1, len(sortedDf)+1)
+        return sortedDf.loc[sortedDf.index == candidate]['Ranking'].values[0]
+
     def rankings(self, mode: Literal['Senators','Partylist']):
         match mode:
             case 'Senators':
                 with st.container(border=True):
                     st.subheader('Senatorial Rankings - Midterm Election 2025',divider=True)
-                    cutoff = st.slider('Number of Candidates to Show', max_value=66,step=1)
+                    cutoff = st.slider('Number of Candidates to Show', max_value=66,step=1, on_change=lambda: st.session_state.update({'TOP_SEN': cutoff}), value=st.session_state['TOP_SEN'])
                     if cutoff > 0:
                         query_STR = "\n"
                         for x in self.get_cols("Senators")[12:]:
@@ -55,7 +89,7 @@ class Widgets(DB):
                 with st.container(border=True):
                     query_STR = "\n"
                     st.subheader('Partylist Rankings - Midterm Election 2025',divider=True)
-                    cutoff = st.slider('Number of Candidates to Show', max_value=156,step=1)
+                    cutoff = st.slider('Number of Candidates to Show', max_value=156,step=1, on_change=lambda: st.session_state.update({'TOP_PARTY': cutoff}), value=st.session_state['TOP_PARTY'])
                     if cutoff > 0:
                         for x in self.get_cols("Partylist")[12:]:
                             query_STR+=f'SUM("{x[1]}"), \n'
@@ -94,11 +128,38 @@ class Widgets(DB):
                         )
                         st.plotly_chart(fig, use_container_width=True, theme='streamlit')
 
-    def showVotes(self, votes: int, candidate: str):
+    def showVotes(self, votes: int, candidate: str, table: str):
         path_dir: str = os.path.join('templates','showvotes.html')
         f = open(path_dir,'r', encoding='utf-8')
-        html = f.read().format(candidate,f"{votes:,}")
-        st.html(html.format(votes, candidate))
+        ranking = self.get_senator_ranking(candidate=candidate, table=table)
+        html = f.read().format(candidate,f"{votes:,}", ranking)
+
+        self.get_senator_ranking(candidate, table) if table == 'senator_votes' else None
+
+        fig = go.Figure()
+        fig.add_trace(go.Pie(labels= ['Voted for', "Didn't Voted"],
+                                values = [votes, self.get_total_votes('Senators' if table == 'senator_votes' else 'Partylist') - votes],
+                                textinfo='label+percent',
+                                textfont_size=14,
+                                textposition='inside',
+                                pull=0.05,
+                                marker=dict(colors=['#17e6a4','#ed5e45']),
+                                hoverinfo='label+percent+value',
+                                hole=.5
+                                ))
+        fig.update_layout(
+            title=f'Votes for {candidate}',
+            title_font_size=16,
+            height=500,
+            legend=dict(
+                orientation="h", 
+                yanchor="top",            
+                xanchor="center",
+                y=-0.2
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True, theme='streamlit')
+        st.html(html.format(votes, candidate, ranking))
     
     def showVotes_byRegion(self, dataSet: list, candidate: str):
         with st.container(border=True):
@@ -140,7 +201,7 @@ class Widgets(DB):
             dataSet = [x[::-1] for x in dataSet]
             df = pd.DataFrame(data=dataSet, columns=['Province','Votes'])
 
-            cutoff = st.slider("Show No. of Provinces", max_value=len(df))
+            cutoff = st.slider("Show No. of Provinces", max_value=len(df), value=int(len(df)/4))
             if cutoff > 0:
                 fig = px.bar(df.sort_values(by='Votes', ascending=False)[:cutoff], 
                             x='Province', 
@@ -196,7 +257,7 @@ class Widgets(DB):
             perbrgy = [x[::-1] for x in perbrgy]
             df = pd.DataFrame(data=perbrgy, columns=['Barangay','Votes'])
 
-            cutoff = st.slider("Show No. of City", max_value=len(df))
+            cutoff = st.slider("Show No. of City", max_value=len(df), value=int(len(df)/4))
             if cutoff > 0:
 
                 fig = px.bar(df.sort_values(by='Votes', ascending=False)[:cutoff], 
